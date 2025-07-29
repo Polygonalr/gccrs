@@ -1744,8 +1744,10 @@ public:
   void accept_vis (ASTVisitor &vis) override;
 
   // TODO: seems kinda dodgy. Think of better way.
-  SlicePatternItems &get_items () { return items; }
-  const SlicePatternItems &get_items () const { return items; }
+  SlicePatternItems &get_items () { 
+    rust_assert (items != nullptr);
+    return *items;
+  }
 
   NodeId get_node_id () const override { return node_id; }
 

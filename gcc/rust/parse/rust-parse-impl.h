@@ -11018,7 +11018,7 @@ Parser<ManagedTokenSource>::parse_slice_pattern ()
 	  if (upper_patterns.has_value ())
 	    {
 	      // DOT_DOT has been parsed before
-	      Error error (lexer.peek_token ()->get_locus (),
+	      Error error (lexer.peek_token ()->get_locus (), "%s",
 			   "`..` can only be used once per slice pattern");
 	      add_error (std::move (error));
 
