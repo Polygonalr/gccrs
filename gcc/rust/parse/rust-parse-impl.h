@@ -11026,6 +11026,7 @@ Parser<ManagedTokenSource>::parse_slice_pattern ()
 	    }
 	  upper_patterns = std::vector<std::unique_ptr<AST::Pattern>> ();
 	  lexer.skip_token ();
+    t = lexer.peek_token ();
 	  continue;
 	}
 
