@@ -2510,6 +2510,12 @@ CfgStrip::visit (AST::SlicePatternItemsHasRest &items)
 }
 
 void
+CfgStrip::visit (AST::SlicePattern &pattern)
+{
+  AST::DefaultASTVisitor::visit (pattern);
+}
+
+void
 CfgStrip::visit (AST::AltPattern &pattern)
 {
   AST::DefaultASTVisitor::visit (pattern);
