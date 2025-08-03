@@ -914,6 +914,45 @@ ASTLoweringBase::lower_tuple_pattern_ranged (
 				       std::move (upper_patterns)));
 }
 
+std::unique_ptr<HIR::SlicePatternItems>
+ASTLoweringBase::lower_slice_pattern_no_rest (
+  AST::SlicePatternItemsNoRest &pattern)
+{
+  std::vector<std::unique_ptr<HIR::Pattern>> patterns;
+  for (auto &p : pattern.get_patterns ())
+    {
+      HIR::Pattern *translated = ASTLoweringPattern::translate (*p);
+      patterns.push_back (std::unique_ptr<HIR::Pattern> (translated));
+    }
+
+  return std::unique_ptr<HIR::SlicePatternItems> (
+    new HIR::SlicePatternItemsNoRest (std::move (patterns)));
+}
+
+std::unique_ptr<HIR::SlicePatternItems>
+ASTLoweringBase::lower_slice_pattern_has_rest (
+  AST::SlicePatternItemsHasRest &pattern)
+{
+  std::vector<std::unique_ptr<HIR::Pattern>> lower_patterns;
+  std::vector<std::unique_ptr<HIR::Pattern>> upper_patterns;
+
+  for (auto &p : pattern.get_lower_patterns ())
+    {
+      HIR::Pattern *translated = ASTLoweringPattern::translate (*p);
+      lower_patterns.push_back (std::unique_ptr<HIR::Pattern> (translated));
+    }
+
+  for (auto &p : pattern.get_upper_patterns ())
+    {
+      HIR::Pattern *translated = ASTLoweringPattern::translate (*p);
+      upper_patterns.push_back (std::unique_ptr<HIR::Pattern> (translated));
+    }
+
+  return std::unique_ptr<HIR::SlicePatternItems> (
+    new HIR::SlicePatternItemsHasRest (std::move (lower_patterns),
+				       std::move (upper_patterns)));
+}
+
 std::unique_ptr<HIR::RangePatternBound>
 ASTLoweringBase::lower_range_pattern_bound (AST::RangePatternBound &bound)
 {

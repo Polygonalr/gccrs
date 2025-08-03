@@ -328,20 +328,16 @@ ASTLoweringPattern::visit (AST::SlicePattern &pattern)
     {
     case AST::SlicePatternItems::SlicePatternItemType::NO_REST:
       {
-	AST::SlicePatternItemsNoRest &ref
+	auto &ref
 	  = static_cast<AST::SlicePatternItemsNoRest &> (pattern.get_items ());
-	for (auto &p : ref.get_patterns ())
-	  {
-	    HIR::Pattern *item = ASTLoweringPattern::translate (*p);
-	    items.push_back (std::unique_ptr<HIR::Pattern> (item));
-	  }
+	items = lower_slice_pattern_no_rest (ref);
       }
       break;
     case AST::SlicePatternItems::SlicePatternItemType::HAS_REST:
       {
-	rust_error_at (pattern.get_locus (),
-		       "lowering of slice patterns with rest elements are not "
-		       "supported yet");
+	auto &ref
+	  = static_cast<AST::SlicePatternItemsHasRest &> (pattern.get_items ());
+	items = ASTLoweringBase::lower_slice_pattern_has_rest (ref);
       }
       break;
     }
