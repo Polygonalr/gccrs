@@ -322,7 +322,7 @@ ASTLoweringPattern::visit (AST::ReferencePattern &pattern)
 void
 ASTLoweringPattern::visit (AST::SlicePattern &pattern)
 {
-  std::vector<std::unique_ptr<HIR::Pattern>> items;
+  std::unique_ptr<HIR::SlicePatternItems> items;
 
   switch (pattern.get_items ().get_pattern_type ())
     {

@@ -1256,7 +1256,7 @@ protected:
 // Class representing patterns within a SlicePattern, without a rest pattern
 class SlicePatternItemsNoRest : public SlicePatternItems
 {
-  std::unique_ptr<SlicePatternItems> items;
+  std::vector<std::unique_ptr<Pattern>> patterns;
 
 public:
   SlicePatternItemsNoRest (std::vector<std::unique_ptr<Pattern>> patterns)

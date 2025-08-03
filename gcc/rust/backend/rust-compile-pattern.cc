@@ -532,25 +532,14 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 	       || lookup->get_kind () == TyTy::TypeKind::SLICE
 	       || lookup->get_kind () == TyTy::REF);
 
-  size_t array_element_index = 0;
+  // function ref that points to either array_index_expression or
+  // slice_index_expression depending on the scrutinee's type
+  tree (&scrutinee_index_expr_func) (tree, tree, location_t);
+
   switch (lookup->get_kind ())
     {
     case TyTy::TypeKind::ARRAY:
-      for (auto &pattern_member : pattern.get_items ())
-	{
-	  tree array_index_tree
-	    = Backend::size_constant_expression (array_element_index++);
-	  tree element_expr
-	    = Backend::array_index_expression (match_scrutinee_expr,
-					       array_index_tree,
-					       pattern.get_locus ());
-	  tree check_expr_sub
-	    = CompilePatternCheckExpr::Compile (*pattern_member, element_expr,
-						ctx);
-	  check_expr = Backend::arithmetic_or_logical_expression (
-	    ArithmeticOrLogicalOperator::BITWISE_AND, check_expr,
-	    check_expr_sub, pattern.get_locus ());
-	}
+      scrutinee_index_expr_func = Backend::array_index_expression;
       break;
     case TyTy::TypeKind::SLICE:
       rust_sorry_at (
@@ -564,21 +553,36 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 	  = Backend::struct_field_expression (match_scrutinee_expr, 1,
 					      pattern.get_locus ());
 
-	// First compare the size
+	// for slices, generate a dynamic size comparison expression tree
+	// because size checking is done at runtime.
 	check_expr = Backend::comparison_expression (
 	  ComparisonOperator::EQUAL, size_field,
 	  build_int_cst (size_type_node, pattern.get_items ().size ()),
 	  pattern.get_locus ());
 
-	// Then compare each element in the slice pattern
-	for (auto &pattern_member : pattern.get_items ())
+	scrutinee_index_expr_func = Backend::slice_index_expression;
+      }
+      break;
+    default:
+      rust_unreachable ();
+    }
+
+  rust_assert (scrutinee_index_expr_func != nullptr);
+
+  size_t element_index = 0;
+  switch (pattern.get_items ().get_item_type ())
+    {
+    case HIR::SlicePatternItems::ItemType::NO_REST:
+      {
+	auto &ref
+	  = static_cast<HIR::SlicePatternItemsNoRest &> (pattern.get_items ());
+	for (auto &pattern_member : ref.get_patterns ())
 	  {
-	    tree slice_index_tree
-	      = Backend::size_constant_expression (array_element_index++);
+	    tree index_tree;
+	    = Backend::size_constant_expression (element_index++);
 	    tree element_expr
-	      = Backend::slice_index_expression (match_scrutinee_expr,
-						 slice_index_tree,
-						 pattern.get_locus ());
+	      = scrutinee_index_expr_func (match_scrutinee_expr, index_tree,
+					   pattern.get_locus ());
 	    tree check_expr_sub
 	      = CompilePatternCheckExpr::Compile (*pattern_member, element_expr,
 						  ctx);
@@ -586,10 +590,12 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 	      ArithmeticOrLogicalOperator::BITWISE_AND, check_expr,
 	      check_expr_sub, pattern.get_locus ());
 	  }
+	break;
       }
+    case HIR::SlicePatternItems::ItemType::HAS_REST:
+      rust_sorry_at (pattern.get_locus (),
+		     "SlicePattern with rest patterns are not yet supported");
       break;
-    default:
-      rust_unreachable ();
     }
 }
 
