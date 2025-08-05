@@ -1086,7 +1086,7 @@ DefaultHIRVisitor::walk (SlicePatternItemsHasRest &items)
 void
 DefaultHIRVisitor::walk (SlicePattern &pattern)
 {
-  pattern.get_items ().accept_vis (*this;)
+  pattern.get_items ().accept_vis (*this);
 }
 
 void

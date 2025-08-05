@@ -2384,7 +2384,7 @@ Dump::visit (SlicePattern &e)
 {
   begin ("SlicePattern");
   do_mappings (e.get_mappings ());
-  visit_collection ("items", e.get_items ());
+  visit_field ("items", e.get_items ());
   end ("SlicePattern");
 }
 
