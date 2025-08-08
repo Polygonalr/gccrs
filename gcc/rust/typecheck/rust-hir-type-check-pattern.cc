@@ -751,11 +751,6 @@ TypeCheckPattern::visit (HIR::SlicePattern &pattern)
 	break;
       }
     }
-
-  for (const auto &item : pattern.get_items ())
-    {
-      TypeCheckPattern::Resolve (*item, parent_element_ty);
-    }
 }
 
 void

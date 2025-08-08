@@ -532,9 +532,10 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 	       || lookup->get_kind () == TyTy::TypeKind::SLICE
 	       || lookup->get_kind () == TyTy::REF);
 
-  // function ref that points to either array_index_expression or
+  // function ptr that points to either array_index_expression or
   // slice_index_expression depending on the scrutinee's type
-  tree (&scrutinee_index_expr_func) (tree, tree, location_t);
+  tree (*scrutinee_index_expr_func) (tree, tree, location_t)
+    = nullptr;
 
   switch (lookup->get_kind ())
     {
@@ -549,18 +550,38 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
     case TyTy::TypeKind::REF:
       {
 	rust_assert (RS_DST_FLAG_P (TREE_TYPE (match_scrutinee_expr)));
+	scrutinee_index_expr_func = Backend::slice_index_expression;
 	tree size_field
 	  = Backend::struct_field_expression (match_scrutinee_expr, 1,
 					      pattern.get_locus ());
 
 	// for slices, generate a dynamic size comparison expression tree
 	// because size checking is done at runtime.
-	check_expr = Backend::comparison_expression (
-	  ComparisonOperator::EQUAL, size_field,
-	  build_int_cst (size_type_node, pattern.get_items ().size ()),
-	  pattern.get_locus ());
-
-	scrutinee_index_expr_func = Backend::slice_index_expression;
+	switch (pattern.get_items ().get_item_type ())
+	  {
+	  case HIR::SlicePatternItems::ItemType::NO_REST:
+	    {
+	      auto &items = static_cast<HIR::SlicePatternItemsNoRest &> (
+		pattern.get_items ());
+	      check_expr = Backend::comparison_expression (
+		ComparisonOperator::EQUAL, size_field,
+		build_int_cst (size_type_node, items.get_patterns ().size ()),
+		pattern.get_locus ());
+	    }
+	    break;
+	  case HIR::SlicePatternItems::ItemType::HAS_REST:
+	    {
+	      auto &items = static_cast<HIR::SlicePatternItemsHasRest &> (
+		pattern.get_items ());
+	      auto pattern_min_cap = items.get_lower_patterns ().size ()
+				     + items.get_upper_patterns ().size ();
+	      check_expr = Backend::comparison_expression (
+		ComparisonOperator::GREATER_OR_EQUAL, size_field,
+		build_int_cst (size_type_node, pattern_min_cap),
+		pattern.get_locus ());
+	    }
+	    break;
+	  }
       }
       break;
     default:
@@ -569,14 +590,15 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 
   rust_assert (scrutinee_index_expr_func != nullptr);
 
+  // Generate tree to compare every element within array/slice
   size_t element_index = 0;
   switch (pattern.get_items ().get_item_type ())
     {
     case HIR::SlicePatternItems::ItemType::NO_REST:
       {
-	auto &ref
+	auto &items
 	  = static_cast<HIR::SlicePatternItemsNoRest &> (pattern.get_items ());
-	for (auto &pattern_member : ref.get_patterns ())
+	for (auto &pattern_member : items.get_patterns ())
 	  {
 	    tree index_tree;
 	    = Backend::size_constant_expression (element_index++);
@@ -593,8 +615,10 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 	break;
       }
     case HIR::SlicePatternItems::ItemType::HAS_REST:
-      rust_sorry_at (pattern.get_locus (),
-		     "SlicePattern with rest patterns are not yet supported");
+      {
+		auto &items = static_cast<HIR::SlicePatternItemsHasRest &> (pattern.get_items());
+		// TO CONTINUE HERE
+	  }
       break;
     }
 }

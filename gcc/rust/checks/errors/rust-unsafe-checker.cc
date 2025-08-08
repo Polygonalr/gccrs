@@ -954,7 +954,7 @@ UnsafeChecker::visit (SlicePatternItemsNoRest &)
 {}
 
 void
-UnsafeChecker::visit (SlicePatternHasRest &)
+UnsafeChecker::visit (SlicePatternItemsHasRest &)
 {}
 
 void
