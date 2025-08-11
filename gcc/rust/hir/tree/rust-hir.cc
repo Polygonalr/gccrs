@@ -4547,6 +4547,18 @@ TuplePattern::accept_vis (HIRFullVisitor &vis)
 }
 
 void
+SlicePatternItemsNoRest::accept_vis (HIRFullVisitor &vis)
+{
+  vis.visit (*this);
+}
+
+void
+SlicePatternItemsHasRest::accept_vis (HIRFullVisitor &vis)
+{
+  vis.visit (*this);
+}
+
+void
 SlicePattern::accept_vis (HIRFullVisitor &vis)
 {
   vis.visit (*this);
