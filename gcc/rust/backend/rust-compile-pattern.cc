@@ -632,7 +632,7 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 	      check_expr_sub, pattern.get_locus ());
 	  }
 
-	// handle codegen for upper patterns differently for both cases
+	// handle codegen for upper patterns differently for both types
 	switch (lookup->get_kind ())
 	  {
 	  case TyTy::TypeKind::ARRAY:
@@ -669,7 +669,6 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 						    pattern.get_locus ());
 	      tree upper_patterns_size = Backend::size_constant_expression (
 		items.get_upper_patterns ().size ());
-		// Backend::debug(upper_patterns_size);
 	      tree index_tree = Backend::arithmetic_or_logical_expression (
 		ArithmeticOrLogicalOperator::SUBTRACT, slice_size,
 		upper_patterns_size, pattern.get_locus ());
@@ -689,7 +688,6 @@ CompilePatternCheckExpr::visit (HIR::SlicePattern &pattern)
 		    ArithmeticOrLogicalOperator::ADD, index_tree,
 		    Backend::size_constant_expression (1),
 		    pattern.get_locus ());
-		// Backend::debug(index_tree);
 		}
 	    }
 	    break;
@@ -1038,45 +1036,121 @@ CompilePatternBindings::visit (HIR::SlicePattern &pattern)
 	       || lookup->get_kind () == TyTy::TypeKind::SLICE
 	       || lookup->get_kind () == TyTy::REF);
 
-  //   size_t array_element_index = 0;
+  // function ptr that points to either array_index_expression or
+  // slice_index_expression depending on the scrutinee's type
+  tree (*scrutinee_index_expr_func) (tree, tree, location_t) = nullptr;
+
   switch (lookup->get_kind ())
     {
     case TyTy::TypeKind::ARRAY:
-      // TODO
-      //   for (auto &pattern_member : pattern.get_items ())
-      // {
-      //   tree array_index_tree
-      //     = Backend::size_constant_expression (array_element_index++);
-      //   tree element_expr
-      //     = Backend::array_index_expression (match_scrutinee_expr,
-      // 				       array_index_tree,
-      // 				       pattern.get_locus ());
-      //   CompilePatternBindings::Compile (*pattern_member, element_expr, ctx);
-      // }
+      scrutinee_index_expr_func = Backend::array_index_expression;
       break;
     case TyTy::TypeKind::SLICE:
-      rust_sorry_at (
-	pattern.get_locus (),
-	"SlicePattern matching against non-ref slices are not yet supported");
+      rust_sorry_at (pattern.get_locus (),
+		     "SlicePattern matching against non-ref slices are "
+		     "not yet supported");
       break;
     case TyTy::TypeKind::REF:
-      {
-	// TODO
-	// for (auto &pattern_member : pattern.get_items ())
-	//   {
-	//     tree slice_index_tree
-	//       = Backend::size_constant_expression (array_element_index++);
-	//     tree element_expr
-	//       = Backend::slice_index_expression (match_scrutinee_expr,
-	// 					 slice_index_tree,
-	// 					 pattern.get_locus ());
-	//     CompilePatternBindings::Compile (*pattern_member, element_expr,
-	// 				     ctx);
-	//   }
-	break;
-      }
+      scrutinee_index_expr_func = Backend::slice_index_expression;
+      break;
     default:
       rust_unreachable ();
+    }
+
+  rust_assert (scrutinee_index_expr_func != nullptr);
+
+  size_t element_index = 0;
+
+  switch (pattern.get_items ().get_item_type ())
+    {
+    case HIR::SlicePatternItems::ItemType::NO_REST:
+      {
+	auto &items
+	  = static_cast<HIR::SlicePatternItemsNoRest &> (pattern.get_items ());
+	for (auto &pattern_member : items.get_patterns ())
+	  {
+	    tree index_tree
+	      = Backend::size_constant_expression (element_index++);
+	    tree element_expr
+	      = scrutinee_index_expr_func (match_scrutinee_expr, index_tree,
+					   pattern.get_locus ());
+	    CompilePatternBindings::Compile (*pattern_member, element_expr,
+					     ctx);
+	  }
+      }
+      break;
+    case HIR::SlicePatternItems::ItemType::HAS_REST:
+      {
+	auto &items
+	  = static_cast<HIR::SlicePatternItemsHasRest &> (pattern.get_items ());
+	for (auto &pattern_member : items.get_lower_patterns ())
+	  {
+	    tree index_tree
+	      = Backend::size_constant_expression (element_index++);
+	    tree element_expr
+	      = scrutinee_index_expr_func (match_scrutinee_expr, index_tree,
+					   pattern.get_locus ());
+	    CompilePatternBindings::Compile (*pattern_member, element_expr,
+					     ctx);
+	  }
+
+	// handle codegen for upper patterns differently for both types
+	switch (lookup->get_kind ())
+	  {
+	  case TyTy::TypeKind::ARRAY:
+	    {
+	      auto array_ty = static_cast<TyTy::ArrayType *> (lookup);
+	      auto cap_tree = array_ty->get_capacity ()->get_value ();
+	      size_t cap_wi = (size_t) wi::to_wide (cap_tree).to_uhwi ();
+	      element_index = cap_wi - items.get_upper_patterns ().size ();
+	      for (auto &pattern_member : items.get_upper_patterns ())
+		{
+		  tree index_tree
+		    = Backend::size_constant_expression (element_index++);
+		  tree element_expr
+		    = scrutinee_index_expr_func (match_scrutinee_expr,
+						 index_tree,
+						 pattern.get_locus ());
+		  CompilePatternBindings::Compile (*pattern_member,
+						   element_expr, ctx);
+		}
+	    }
+	    break;
+	  case TyTy::TypeKind::SLICE:
+	    rust_sorry_at (pattern.get_locus (),
+			   "SlicePattern matching against non-ref slices are "
+			   "not yet supported");
+	    break;
+	  case TyTy::TypeKind::REF:
+	    {
+	      tree slice_size
+		= Backend::struct_field_expression (match_scrutinee_expr, 1,
+						    pattern.get_locus ());
+	      tree upper_patterns_size = Backend::size_constant_expression (
+		items.get_upper_patterns ().size ());
+	      tree index_tree = Backend::arithmetic_or_logical_expression (
+		ArithmeticOrLogicalOperator::SUBTRACT, slice_size,
+		upper_patterns_size, pattern.get_locus ());
+	      for (auto &pattern_member : items.get_upper_patterns ())
+		{
+		  tree element_expr
+		    = scrutinee_index_expr_func (match_scrutinee_expr,
+						 index_tree,
+						 pattern.get_locus ());
+		  CompilePatternBindings::Compile (*pattern_member,
+						   element_expr, ctx);
+		  index_tree = Backend::arithmetic_or_logical_expression (
+		    ArithmeticOrLogicalOperator::ADD, index_tree,
+		    Backend::size_constant_expression (1),
+		    pattern.get_locus ());
+		}
+	    }
+	    break;
+	  default:
+	    rust_unreachable ();
+	  }
+      }
+      break;
     }
 }
 
