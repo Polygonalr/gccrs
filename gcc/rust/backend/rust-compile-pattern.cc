@@ -161,6 +161,30 @@ CompilePatternCheckExpr::visit (HIR::RangePattern &pattern)
 					    pattern.get_mappings (),
 					    pattern.get_locus (), ctx);
 
+  rust_assert (
+    (TREE_CODE (upper) == REAL_CST && TREE_CODE (lower) == REAL_CST)
+    || (TREE_CODE (upper) == INTEGER_CST && TREE_CODE (lower) == INTEGER_CST));
+
+  bool error_E0579 = false;
+  if (TREE_CODE (upper) == REAL_CST)
+    {
+      REAL_VALUE_TYPE upper_r = TREE_REAL_CST (upper);
+      REAL_VALUE_TYPE lower_r = TREE_REAL_CST (lower);
+      if (real_compare (GE_EXPR, &lower_r, &upper_r))
+	error_E0579 = true;
+    }
+  else if (TREE_CODE (upper) == INTEGER_CST)
+    {
+      auto upper_wi = wi::to_wide (upper).to_shwi ();
+      auto lower_wi = wi::to_wide (lower).to_shwi ();
+      if (lower_wi >= upper_wi)
+	error_E0579 = true;
+    }
+
+  if (error_E0579)
+    rust_error_at (pattern.get_locus (), ErrorCode::E0579,
+		   "lower range bound must be less than upper");
+
   ComparisonOperator upper_cmp = pattern.is_inclusive_range ()
 				   ? ComparisonOperator::LESS_OR_EQUAL
 				   : ComparisonOperator::LESS_THAN;
