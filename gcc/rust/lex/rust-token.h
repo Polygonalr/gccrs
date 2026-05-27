@@ -134,6 +134,8 @@ enum PrimitiveCoreType
   RS_TOKEN (BYTE_STRING_LITERAL, "byte string literal")                        \
   RS_TOKEN (RAW_STRING_LITERAL, "raw string literal")                          \
   RS_TOKEN (BYTE_CHAR_LITERAL, "byte character literal")                       \
+  RS_TOKEN (C_STRING_LITERAL, "C string literal")                              \
+  RS_TOKEN (RAW_C_STRING_LITERAL, "raw C string literal")                      \
   RS_TOKEN (LIFETIME, "lifetime") /* TODO: improve token type */               \
   /* Have "interpolated" tokens (whatever that means)? identifer, path, type,  \
    * pattern, */                                                               \
@@ -420,6 +422,11 @@ public:
   static TokenPtr make_raw_string (location_t locus, std::string str)
   {
     return TokenPtr (new Token (RAW_STRING_LITERAL, locus, std::move (str)));
+  }
+
+  static TokenPtr make_c_string (location_t locus, std::string str)
+  {
+    return TokenPtr (new Token (C_STRING_LITERAL, locus, std::move (str)));
   }
 
   // Makes and returns a new TokenPtr of type INNER_DOC_COMMENT.
