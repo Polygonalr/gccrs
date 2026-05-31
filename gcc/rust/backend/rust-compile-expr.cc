@@ -1909,10 +1909,9 @@ CompileExpr::compile_c_string_literal (const HIR::LiteralExpr &expr,
 				       const TyTy::BaseType *tyty)
 {
   // Copied from compile_string_literal
-  // TODO verify that behaviour is still correct
   tree fat_pointer = TyTyResolveCompile::compile (ctx, tyty);
 
-  rust_assert (expr.get_lit_type () == HIR::Literal::STRING);
+  rust_assert (expr.get_lit_type () == HIR::Literal::C_STRING);
   const auto literal_value = expr.get_literal ();
 
   auto base = Backend::string_constant_expression (literal_value.as_string ());
@@ -1923,7 +1922,8 @@ CompileExpr::compile_c_string_literal (const HIR::LiteralExpr &expr,
   rust_assert (ok);
   tree type = TyTyResolveCompile::compile (ctx, usize);
 
-  tree size = build_int_cstu (type, literal_value.as_string ().size ());
+  // +1 for null terminator, unlike Rust string literals.
+  tree size = build_int_cstu (type, literal_value.as_string ().size () + 1);
 
   return Backend::constructor_expression (fat_pointer, false, {data, size}, -1,
 					  expr.get_locus ());

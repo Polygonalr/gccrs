@@ -388,6 +388,15 @@ TypeCheckBase::resolve_literal (const Analysis::NodeMapping &expr_mappings,
       break;
     case HIR::Literal::LitType::C_STRING:
       {
+	// Throw error if C string literal contains null byte
+	if (literal.as_string ().find ('\0') != std::string::npos)
+	  {
+	    rust_error_at (
+	      locus, "null characters in C string literals are not supported");
+	    infered = new TyTy::ErrorType (expr_mappings.get_hirid (), locus);
+	    break;
+	  }
+
 	/* This is a pointer to a null-terminated byte slice (&[u8]). Code
 	   to construct the pointer copied from ArrayElemsValues and
 	   PointerType. */
