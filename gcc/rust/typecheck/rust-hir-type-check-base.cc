@@ -386,7 +386,32 @@ TypeCheckBase::resolve_literal (const Analysis::NodeMapping &expr_mappings,
 					   TyTy::Region::make_static ());
       }
       break;
+    case HIR::Literal::LitType::C_STRING:
+      {
+	/* This is a pointer to a null-terminated byte slice (&[u8]). Code
+	   to construct the pointer copied from ArrayElemsValues and
+	   PointerType. */
+	TyTy::BaseType *u8;
+	auto ok = context->lookup_builtin ("u8", &u8);
+	rust_assert (ok);
 
+	auto crate_num = mappings.get_current_crate ();
+	Analysis::NodeMapping slice_mapping (crate_num, UNKNOWN_NODEID,
+					     mappings.get_next_hir_id (
+					       crate_num),
+					     UNKNOWN_LOCAL_DEFID);
+
+	TyTy::SliceType *slice
+	  = new TyTy::SliceType (slice_mapping.get_hirid (), locus,
+				 TyTy::TyVar (u8->get_ref ()));
+	context->insert_type (slice_mapping, slice);
+
+	infered = new TyTy::ReferenceType (expr_mappings.get_hirid (),
+					   TyTy::TyVar (slice->get_ref ()),
+					   Mutability::Imm,
+					   TyTy::Region::make_static ());
+      }
+      break;
     default:
       rust_unreachable ();
       break;
