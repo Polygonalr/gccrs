@@ -685,6 +685,41 @@ TyTyResolveCompile::visit (const TyTy::ReferenceType &type)
       return;
     }
 
+  // Check for CStr, create a specific record for it
+  do
+    {
+      if (type.get_base ()->get_kind () != TyTy::TypeKind::ADT)
+	break;
+
+      const TyTy::ADTType *adt
+	= static_cast<const TyTy::ADTType *> (type.get_base ());
+      auto &mappings = Analysis::Mappings::get ();
+      auto cstr_item = mappings.lookup_lang_item (LangItem::Kind::CSTR);
+      if (!cstr_item.has_value ())
+	break;
+
+      HirId cstr_hirid = mappings.lookup_defid (cstr_item.value ())
+			   .value ()
+			   ->get_mappings ()
+			   .get_hirid ();
+
+      if (cstr_hirid != adt->get_ref ())
+	break;
+
+      // &CStr is a fat pointer: { *const u8, usize }
+      // Reuse the c_char (u8) slice fat-pointer layout
+      TyTy::BaseType *u8 = nullptr;
+      ctx->get_tyctx ()->lookup_builtin ("u8", &u8);
+      // Create a synthetic SliceType over u8 and use that record layout
+      TyTy::SliceType synthetic_slice (adt->get_ref (), adt->get_ident ().locus,
+				       TyTy::TyVar (u8->get_ref ()));
+      tree type_record = create_slice_type_record (synthetic_slice);
+      translated
+	= Backend::named_type ("&CStr", type_record, adt->get_ident ().locus);
+      return;
+    }
+  while (false);
+
   tree base_compiled_type
     = TyTyResolveCompile::compile (ctx, type.get_base (), trait_object_mode);
   if (type.is_mutable ())

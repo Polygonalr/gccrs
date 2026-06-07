@@ -92,6 +92,7 @@ const BiMap<std::string, LangItem::Kind> Rust::LangItem::lang_items = {{
   {"slice_u8", Kind::SLICE_U8},
   {"slice", Kind::SLICE},
   {"str", Kind::STR},
+  {"CStr", Kind::CSTR},
   {"f32_runtime", Kind::F32_RUNTIME},
   {"f64_runtime", Kind::F64_RUNTIME},
 

@@ -125,6 +125,7 @@ public:
     SLICE_U8,
     SLICE,
     STR,
+    CSTR,
     F32_RUNTIME,
     F64_RUNTIME,
 
