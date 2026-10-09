@@ -93,6 +93,8 @@ HandlerBuilder atomic_and (int ordering);
 HandlerBuilder atomic_nand (int ordering);
 HandlerBuilder atomic_or (int ordering);
 HandlerBuilder atomic_xor (int ordering);
+HandlerBuilder atomic_min (int ordering);
+HandlerBuilder atomic_max (int ordering);
 
 const HandlerBuilder unchecked_op (tree_code op);
 

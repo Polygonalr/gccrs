@@ -1225,6 +1225,21 @@ atomic_xor (int ordering)
   };
 }
 
+HandlerBuilder
+atomic_max (int ordering)
+{
+  return [ordering] (Context *ctx, TyTy::FnType *fntype, location_t) {
+    return inner::atomic_binary_op (ctx, fntype, "fetch_max", ordering);
+  };
+}
+HandlerBuilder
+atomic_min (int ordering)
+{
+  return [ordering] (Context *ctx, TyTy::FnType *fntype, location_t) {
+    return inner::atomic_binary_op (ctx, fntype, "fetch_min", ordering);
+  };
+}
+
 const HandlerBuilder
 unchecked_op (tree_code op)
 {
