@@ -39,6 +39,8 @@ tree atomic_store (Context *ctx, TyTy::FnType *fntype, int ordering);
 tree atomic_load (Context *ctx, TyTy::FnType *fntype, int ordering);
 tree atomic_binary_op (Context *ctx, TyTy::FnType *fntype,
 		       const std::string &op_name, int ordering);
+tree atomic_compare_exchange (Context *ctx, TyTy::FnType *fntype, bool weak,
+			      int success_ordering, int failure_ordering);
 inline tree copy (Context *ctx, TyTy::FnType *fntype, bool overlaps);
 inline tree expect (Context *ctx, TyTy::FnType *fntype, bool likely);
 tree try_handler (Context *ctx, TyTy::FnType *fntype, bool is_new_api);
@@ -93,6 +95,8 @@ HandlerBuilder atomic_and (int ordering);
 HandlerBuilder atomic_nand (int ordering);
 HandlerBuilder atomic_or (int ordering);
 HandlerBuilder atomic_xor (int ordering);
+HandlerBuilder atomic_compare_exchange (bool weak, int success_ordering,
+					int failure_ordering);
 
 const HandlerBuilder unchecked_op (tree_code op);
 

@@ -806,6 +806,95 @@ atomic_binary_op (Context *ctx, TyTy::FnType *fntype,
   return fndecl;
 }
 
+// Compiles atomic compare exchange with signature (*mut T, T, T) -> (T, bool).
+tree
+atomic_compare_exchange (Context *ctx, TyTy::FnType *fntype, bool weak,
+			 int success_ordering, int failure_ordering)
+{
+  rust_assert (fntype->get_params ().size () == 3);
+  rust_assert (fntype->get_num_substitutions () == 1);
+  rust_assert (fntype->get_return_type ()->get_kind ()
+	       == TyTy::TypeKind::TUPLE);
+
+  tree lookup = NULL_TREE;
+  if (check_for_cached_intrinsic (ctx, fntype, &lookup))
+    return lookup;
+
+  auto fndecl = compile_intrinsic_function (ctx, fntype);
+
+  // Most intrinsic functions are pure but not the atomic ones
+  TREE_READONLY (fndecl) = 0;
+  TREE_SIDE_EFFECTS (fndecl) = 1;
+
+  // setup the params
+  std::vector<Bvariable *> param_vars;
+  std::vector<tree> types;
+  compile_fn_params (ctx, fntype, fndecl, &param_vars, &types);
+
+  auto ok = Backend::function_set_parameters (fndecl, param_vars);
+  rust_assert (ok);
+
+  tree tmp_stmt = NULL_TREE;
+  Bvariable *expected_var
+    = Backend::temporary_variable (fndecl, NULL_TREE, types[1], NULL_TREE, true,
+				   UNDEF_LOCATION, &tmp_stmt);
+  Bvariable *success_var
+    = Backend::temporary_variable (fndecl, NULL_TREE, boolean_type_node,
+				   NULL_TREE, false, UNDEF_LOCATION, &tmp_stmt);
+  enter_intrinsic_block (ctx, fndecl, {expected_var, success_var});
+
+  auto dst = Backend::var_expression (param_vars[0], UNDEF_LOCATION);
+  TREE_READONLY (dst) = 0;
+
+  auto expected = expected_var->get_tree (UNDEF_LOCATION);
+  auto success = success_var->get_tree (UNDEF_LOCATION);
+
+  auto old_value = Backend::var_expression (param_vars[1], UNDEF_LOCATION);
+  auto new_value = Backend::var_expression (param_vars[2], UNDEF_LOCATION);
+
+  auto monomorphized_type
+    = fntype->get_substs ()[0].get_param_ty ()->resolve ();
+
+  auto call_locus = ctx->get_mappings ().lookup_location (fntype->get_ref ());
+  auto builtin_decl = resolve_atomic_builtin (ctx, "atomic_compare_exchange",
+					      call_locus, monomorphized_type);
+
+  if (!builtin_decl || builtin_decl == error_mark_node)
+    return error_mark_node;
+
+  ctx->add_statement (
+    Backend::assignment_statement (expected, old_value, UNDEF_LOCATION));
+
+  auto expected_addr = build_fold_addr_expr_loc (UNDEF_LOCATION, expected);
+  auto builtin_addr = build_fold_addr_expr_loc (UNDEF_LOCATION, builtin_decl);
+  auto weak_flag = build_int_cst (boolean_type_node, weak);
+  auto success_memorder = make_unsigned_long_tree (success_ordering);
+  auto failure_memorder = make_unsigned_long_tree (failure_ordering);
+
+  auto exchange_call
+    = Backend::call_expression (builtin_addr,
+				{dst, expected_addr, new_value, weak_flag,
+				 success_memorder, failure_memorder},
+				nullptr, UNDEF_LOCATION);
+  TREE_READONLY (exchange_call) = 0;
+  TREE_SIDE_EFFECTS (exchange_call) = 1;
+
+  auto assignment_statement
+    = Backend::assignment_statement (success, exchange_call, UNDEF_LOCATION);
+  ctx->add_statement (assignment_statement);
+
+  auto tuple_type = TREE_TYPE (DECL_RESULT (fndecl));
+  auto result
+    = Backend::constructor_expression (tuple_type, false, {expected, success},
+				       -1, UNDEF_LOCATION);
+  auto return_statement
+    = Backend::return_statement (fndecl, result, UNDEF_LOCATION);
+  ctx->add_statement (return_statement);
+  finalize_intrinsic_block (ctx, fndecl);
+
+  return fndecl;
+}
+
 // Shared inner implementation for ctlz and ctlz_nonzero.
 //
 // nonzero=false → ctlz: ctlz(0) is well-defined in Rust and must return
@@ -1222,6 +1311,15 @@ atomic_xor (int ordering)
 {
   return [ordering] (Context *ctx, TyTy::FnType *fntype, location_t) {
     return inner::atomic_binary_op (ctx, fntype, "fetch_xor", ordering);
+  };
+}
+HandlerBuilder
+atomic_compare_exchange (bool weak, int success_ordering, int failure_ordering)
+{
+  return [weak, success_ordering,
+	  failure_ordering] (Context *ctx, TyTy::FnType *fntype, location_t) {
+    return inner::atomic_compare_exchange (ctx, fntype, weak, success_ordering,
+					   failure_ordering);
   };
 }
 
